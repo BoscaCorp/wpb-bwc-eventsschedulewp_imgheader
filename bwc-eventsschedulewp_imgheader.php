@@ -2,7 +2,7 @@
 /*
 Plugin Name: BWC Img Header (WPBakery + Events Schedule WP Plugin)
 Description: En-tête image (hero) avec CTA dynamique selon l’événement (WPBakery).
-Version: 1.1.1
+Version: 1.1.2
 Author: BWC
 Author URI: https://github.com/beworldcorp
 Text Domain: wpb-bwc-eventsschedulewp_imgheader
@@ -15,7 +15,7 @@ Primary Branch: main
 
 if (!defined('ABSPATH')) exit;
 
-define('BWC_SIH_VERSION', '1.1.1');
+define('BWC_SIH_VERSION', '1.1.2');
 define('BWC_SIH_FILE', __FILE__);
 define('BWC_SIH_PATH', plugin_dir_path(__FILE__));
 define('BWC_SIH_URL', plugin_dir_url(__FILE__));

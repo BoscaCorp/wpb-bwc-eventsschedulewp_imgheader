@@ -10,13 +10,17 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
     // Shortcode
     add_shortcode('bwc_simple_img_header', [$this, 'render_shortcode']);
 
-    // Assets
+    // Assets (registre le style globalement)
     add_action('wp_enqueue_scripts', [$this, 'register_assets']);
   }
 
   public function register_assets() {
-    // Suppose que BWC_SIH_URL et BWC_SIH_VERSION sont définis dans le fichier principal du plugin
-    wp_register_style('bwc-eventsschedulewp_imgheader', BWC_SIH_URL . 'public/css/style.css', [], BWC_SIH_VERSION);
+    wp_register_style(
+      'bwc-eventsschedulewp_imgheader',
+      BWC_SIH_URL . 'public/css/style.css',
+      [],
+      BWC_SIH_VERSION
+    );
   }
 
   public function vc_map_element() {
@@ -33,7 +37,6 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
           'type'        => 'attach_image',
           'heading'     => __('Image', 'wpb-bwc-eventsschedulewp_imgheader'),
           'param_name'  => 'image_id',
-          'description' => __('Sélectionne une image (attach_image retourne un ID).', 'wpb-bwc-eventsschedulewp_imgheader'),
         ],
         [
           'type'        => 'textfield',
@@ -54,14 +57,11 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
           'type'        => 'textfield',
           'heading'     => __('Lien (mode “Lien”)', 'wpb-bwc-eventsschedulewp_imgheader'),
           'param_name'  => 'linkimg',
-          'description' => __('URL utilisée quand “Choix du spectacle” = Lien.', 'wpb-bwc-eventsschedulewp_imgheader'),
         ],
-        // Champ libre de recherche (tu peux le garder pour compat)
         [
           'type'        => 'textfield',
           'heading'     => __('Requête événement (texte libre)', 'wpb-bwc-eventsschedulewp_imgheader'),
           'param_name'  => 'event_name',
-          'description' => __('Saisis un mot-clé (ex. "gala", "cendrillon").', 'wpb-bwc-eventsschedulewp_imgheader'),
         ],
         [
           'type'        => 'textfield',
@@ -87,24 +87,14 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
     return implode(' ', array_filter($safe));
   }
 
-  /**
-   * Formatte une date (timestamp Unix) selon la locale courante (Polylang/WPML friendly).
-   * Utilise IntlDateFormatter si dispo, sinon fallback sur wp_date() avec switch_to_locale().
-   * Retourne du HTML avec les bons spans/classes.
-   */
   private function format_event_date_html(int $ts): string {
     if ($ts <= 0) return '';
 
-    // Locale courante (respecte les plugins multi-langue)
     $locale = function_exists('determine_locale') ? determine_locale() : get_locale();
-    $tz     = wp_timezone(); // DateTimeZone
+    $tz     = wp_timezone();
 
     if (class_exists('IntlDateFormatter')) {
-      // Jour de la semaine (lundi, Monday…)
       $dayFmt  = new IntlDateFormatter($locale, \IntlDateFormatter::FULL, \IntlDateFormatter::NONE, $tz, null, 'EEEE');
-      // Jour + mois en toutes lettres + année (ex: 17 septembre 2025 / September 17, 2025)
-      // Remarque: 'd MMMM y' donne "17 septembre 2025" / "September 17, 2025" selon locale
-      // Pour coller à ton markup (deux spans séparés), on sépare jour vs reste.
       $dateFmt = new IntlDateFormatter($locale, \IntlDateFormatter::FULL, \IntlDateFormatter::NONE, $tz, null, 'd MMMM y');
 
       $day  = $dayFmt->format($ts);
@@ -117,15 +107,10 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
       );
     }
 
-    // Fallback sans Intl : on bascule temporairement sur la locale courante pour wp_date()
-    if (function_exists('switch_to_locale')) {
-      switch_to_locale($locale);
-    }
+    if (function_exists('switch_to_locale')) switch_to_locale($locale);
     $day  = wp_date('l', $ts, $tz);
     $date = wp_date('d F Y', $ts, $tz);
-    if (function_exists('restore_previous_locale')) {
-      restore_previous_locale();
-    }
+    if (function_exists('restore_previous_locale')) restore_previous_locale();
 
     return sprintf(
       '<span class="prod-events_day">%s</span> <span class="prod-events_dates_contents">%s</span>',
@@ -146,7 +131,11 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
       'extra_class'  => '',
     ], $atts, 'bwc_simple_img_header');
 
-    // Données
+    // === CSS chargé seulement si le shortcode est utilisé ===
+    add_action('wp_enqueue_scripts', function () {
+      wp_enqueue_style('bwc-eventsschedulewp_imgheader');
+    });
+
     $image_id     = intval($atts['image_id']);
     $img_url      = $image_id ? wp_get_attachment_image_url($image_id, 'full') : '';
     $title        = wp_kses_post($atts['title']);
@@ -157,9 +146,8 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
     $element_id   = sanitize_title($atts['element_id']);
     $extra_class  = $this->sanitize_classes($atts['extra_class']);
 
-    // Libellés CTA (locale-aware)
     $locale = function_exists('determine_locale') ? determine_locale() : get_locale();
-    $is_en  = (stripos($locale, 'en') === 0); // plus robuste que === 'en_US'
+    $is_en  = (stripos($locale, 'en') === 0);
 
     if ($eventName === 'link') {
       $reservationBtn = $is_en ? 'Discover the website' : 'Découvrir le site';
@@ -169,7 +157,6 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
       $soonBtn        = $is_en ? 'On sale soon' : 'En vente prochainement';
     }
 
-    // Événements (optionnel selon event_name)
     $events = [];
     if ($eventName !== 'none') {
       $now  = new DateTime('now', wp_timezone());
@@ -178,27 +165,21 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
         'posts_per_page' => -1,
         'order'          => 'ASC',
         'post_status'    => 'publish',
-        's'              => $eventName, // recherche plein-texte (hérite de ton implémentation)
+        's'              => $eventName,
       ];
       $query = new WP_Query($args);
 
       if ($query->have_posts()) {
         while ($query->have_posts()) {
           $query->the_post();
-          $eventID = get_the_ID();
-          $name    = get_the_title();
-          $meta    = get_post_meta($eventID);
-          $ts      = isset($meta['_wcs_timestamp'][0]) ? intval($meta['_wcs_timestamp'][0]) : 0;
+          $meta = get_post_meta(get_the_ID());
+          $ts   = isset($meta['_wcs_timestamp'][0]) ? intval($meta['_wcs_timestamp'][0]) : 0;
 
           if ($ts > 0 && $ts >= $now->getTimestamp()) {
-            // >>> NOUVEAU : formatage 100% localisé <<<
             $dateEvent = $this->format_event_date_html($ts);
-
-            $reservationLink = !empty($meta['_wcs_reservation_link'][0]) ? $meta['_wcs_reservation_link'][0] : '';
-            $events[] = [
-              'name' => $name,
+            $events[]  = [
               'date' => $dateEvent,
-              'link' => esc_url($reservationLink),
+              'link' => !empty($meta['_wcs_reservation_link'][0]) ? esc_url($meta['_wcs_reservation_link'][0]) : '',
             ];
           }
         }
@@ -206,57 +187,41 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
       }
     }
 
-    // Enqueue CSS seulement si shortcode présent
-    wp_enqueue_style('bwc-eventsschedulewp_imgheader');
+    $output  = '<div class="simple-img-header-container ' . esc_attr($extra_class) . '" ' . ($element_id ? 'id="'.esc_attr($element_id).'"' : '') . '>';
+    if ($img_url) {
+      $output .= '<img src="' . esc_url($img_url) . '" alt="' . esc_attr(wp_strip_all_tags($title ?: '')) . '"/>';
+    }
 
-    // HTML
-    $output  = '';
-    $output .= '<div class="simple-img-header-container ' . esc_attr($extra_class) . '" ' . ($element_id ? 'id="'.esc_attr($element_id).'"' : '') . '>';
+    $output .= '<div class="simple-img-header-centered">';
+    if ($title) $output .= '<h2 class="simple-img-header-title">' . $title . '</h2>';
+    if ($subtitle) $output .= '<h3 class="simple-img-header-subtitle">' . $subtitle . '</h3>';
+    if ($subsubtitle) $output .= '<h4 class="simple-img-header-subsubtitle">' . $subsubtitle . '</h4>';
 
-      if ($img_url) {
-        $output .= '<img src="' . esc_url($img_url) . '" alt="' . esc_attr(wp_strip_all_tags($title ?: '')) . '"/>';
+    if (!empty($events)) {
+      $first = $events[0];
+      $output .= '<div class="prod-events_container">';
+      if (empty($first['link'])) {
+        $output .= '<div class="prod-events_link_empty"><span>' . esc_html($soonBtn) . '</span></div>';
+      } else {
+        $output .= '<div class="prod-events_link"><a href="' . $first['link'] . '">' . esc_html($reservationBtn) . '</a></div>';
       }
+      $output .= '<div class="prod-events_date">' . $first['date'] . '</div>';
+      $output .= '</div>';
+    } elseif ($eventName === 'link') {
+      $output .= '<div class="prod-events_container">';
+      if (!empty($linkimg)) {
+        $output .= '<div class="prod-events_link"><a href="' . esc_url($linkimg) . '">' . esc_html($reservationBtn) . '</a></div>';
+      } else {
+        $output .= '<div class="prod-events_link_empty"><span>' . esc_html($soonBtn) . '</span></div>';
+      }
+      $output .= '</div>';
+    }
 
-      $output .= '<div class="simple-img-header-centered">';
-        if ($title) {
-          $output .= '<h2 class="simple-img-header-title">' . $title . '</h2>';
-        }
-        if ($subtitle) {
-          $output .= '<h3 class="simple-img-header-subtitle">' . $subtitle . '</h3>';
-        }
-        if ($subsubtitle) {
-          $output .= '<h4 class="simple-img-header-subsubtitle">' . $subsubtitle . '</h4>';
-        }
-
-        // Bloc CTA + date
-        if (!empty($events)) {
-          $first = $events[0];
-          $output .= '<div class="prod-events_container">';
-            if (empty($first['link'])) {
-              $output .= '<div class="prod-events_link_empty"><span>' . esc_html($soonBtn) . '</span></div>';
-            } else {
-              $output .= '<div class="prod-events_link"><a href="' . $first['link'] . '">' . esc_html($reservationBtn) . '</a></div>';
-            }
-            $output .= '<div class="prod-events_date">' . $first['date'] . '</div>';
-          $output .= '</div>';
-        } elseif ($eventName === 'link') {
-          $output .= '<div class="prod-events_container">';
-            if (!empty($linkimg)) {
-              $output .= '<div class="prod-events_link"><a href="' . esc_url($linkimg) . '">' . esc_html($reservationBtn) . '</a></div>';
-            } else {
-              $output .= '<div class="prod-events_link_empty"><span>' . esc_html($soonBtn) . '</span></div>';
-            }
-          $output .= '</div>';
-        }
-
-      $output .= '</div>'; // .simple-img-header-centered
-    $output .= '</div>';   // .simple-img-header-container
-
+    $output .= '</div></div>';
     return $output;
   }
 }
 
-// Stub WPBakery aligné sur base = bwc_simple_img_header
 if (class_exists('WPBakeryShortCode') && !class_exists('WPBakeryShortCode_Bwc_Simple_Img_Header')) {
   class WPBakeryShortCode_Bwc_Simple_Img_Header extends WPBakeryShortCode {}
 }
