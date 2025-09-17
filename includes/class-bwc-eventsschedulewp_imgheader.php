@@ -10,7 +10,7 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
     // Shortcode
     add_shortcode('bwc_simple_img_header', [$this, 'render_shortcode']);
 
-    // Assets (registre le style globalement)
+    // Assets (on enregistre uniquement, on n’enfile pas ici)
     add_action('wp_enqueue_scripts', [$this, 'register_assets']);
   }
 
@@ -34,46 +34,46 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
       'icon'        => 'dashicons-format-image',
       'params'      => [
         [
-          'type'        => 'attach_image',
-          'heading'     => __('Image', 'wpb-bwc-eventsschedulewp_imgheader'),
-          'param_name'  => 'image_id',
+          'type'       => 'attach_image',
+          'heading'    => __('Image', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'param_name' => 'image_id',
         ],
         [
-          'type'        => 'textfield',
-          'heading'     => __('Titre image', 'wpb-bwc-eventsschedulewp_imgheader'),
-          'param_name'  => 'title',
+          'type'       => 'textfield',
+          'heading'    => __('Titre image', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'param_name' => 'title',
         ],
         [
-          'type'        => 'textfield',
-          'heading'     => __('Sous-titre image', 'wpb-bwc-eventsschedulewp_imgheader'),
-          'param_name'  => 'subtitle',
+          'type'       => 'textfield',
+          'heading'    => __('Sous-titre image', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'param_name' => 'subtitle',
         ],
         [
-          'type'        => 'textfield',
-          'heading'     => __('Sous-titre 2 image', 'wpb-bwc-eventsschedulewp_imgheader'),
-          'param_name'  => 'subsubtitle',
+          'type'       => 'textfield',
+          'heading'    => __('Sous-titre 2 image', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'param_name' => 'subsubtitle',
         ],
         [
-          'type'        => 'textfield',
-          'heading'     => __('Lien (mode “Lien”)', 'wpb-bwc-eventsschedulewp_imgheader'),
-          'param_name'  => 'linkimg',
+          'type'       => 'textfield',
+          'heading'    => __('Lien (mode “Lien”)', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'param_name' => 'linkimg',
         ],
         [
-          'type'        => 'textfield',
-          'heading'     => __('Requête événement (texte libre)', 'wpb-bwc-eventsschedulewp_imgheader'),
-          'param_name'  => 'event_name',
+          'type'       => 'textfield',
+          'heading'    => __('Requête événement (texte libre)', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'param_name' => 'event_name',
         ],
         [
-          'type'        => 'textfield',
-          'heading'     => __('Element ID', 'wpb-bwc-eventsschedulewp_imgheader'),
-          'param_name'  => 'element_id',
-          'group'       => __('Extra', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'type'       => 'textfield',
+          'heading'    => __('Element ID', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'param_name' => 'element_id',
+          'group'      => __('Extra', 'wpb-bwc-eventsschedulewp_imgheader'),
         ],
         [
-          'type'        => 'textfield',
-          'heading'     => __('Extra class name', 'wpb-bwc-eventsschedulewp_imgheader'),
-          'param_name'  => 'extra_class',
-          'group'       => __('Extra', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'type'       => 'textfield',
+          'heading'    => __('Extra class name', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'param_name' => 'extra_class',
+          'group'      => __('Extra', 'wpb-bwc-eventsschedulewp_imgheader'),
         ],
       ],
     ]);
@@ -96,14 +96,10 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
     if (class_exists('IntlDateFormatter')) {
       $dayFmt  = new IntlDateFormatter($locale, \IntlDateFormatter::FULL, \IntlDateFormatter::NONE, $tz, null, 'EEEE');
       $dateFmt = new IntlDateFormatter($locale, \IntlDateFormatter::FULL, \IntlDateFormatter::NONE, $tz, null, 'd MMMM y');
-
-      $day  = $dayFmt->format($ts);
-      $date = $dateFmt->format($ts);
-
       return sprintf(
         '<span class="prod-events_day">%s</span> <span class="prod-events_dates_contents">%s</span>',
-        esc_html($day),
-        esc_html($date)
+        esc_html($dayFmt->format($ts)),
+        esc_html($dateFmt->format($ts))
       );
     }
 
@@ -120,6 +116,9 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
   }
 
   public function render_shortcode($atts, $content = null, $tag = '') {
+    // Charge le CSS uniquement ici
+    wp_enqueue_style('bwc-eventsschedulewp_imgheader');
+
     $atts = shortcode_atts([
       'image_id'     => '',
       'title'        => '',
@@ -131,20 +130,15 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
       'extra_class'  => '',
     ], $atts, 'bwc_simple_img_header');
 
-    // === CSS chargé seulement si le shortcode est utilisé ===
-    add_action('wp_enqueue_scripts', function () {
-      wp_enqueue_style('bwc-eventsschedulewp_imgheader');
-    });
-
-    $image_id     = intval($atts['image_id']);
-    $img_url      = $image_id ? wp_get_attachment_image_url($image_id, 'full') : '';
-    $title        = wp_kses_post($atts['title']);
-    $subtitle     = wp_kses_post($atts['subtitle']);
-    $subsubtitle  = wp_kses_post($atts['subsubtitle']);
-    $linkimg      = esc_url_raw($atts['linkimg']);
-    $eventName    = sanitize_text_field($atts['event_name']);
-    $element_id   = sanitize_title($atts['element_id']);
-    $extra_class  = $this->sanitize_classes($atts['extra_class']);
+    $image_id    = intval($atts['image_id']);
+    $img_url     = $image_id ? wp_get_attachment_image_url($image_id, 'full') : '';
+    $title       = wp_kses_post($atts['title']);
+    $subtitle    = wp_kses_post($atts['subtitle']);
+    $subsubtitle = wp_kses_post($atts['subsubtitle']);
+    $linkimg     = esc_url_raw($atts['linkimg']);
+    $eventName   = sanitize_text_field($atts['event_name']);
+    $element_id  = sanitize_title($atts['element_id']);
+    $extra_class = $this->sanitize_classes($atts['extra_class']);
 
     $locale = function_exists('determine_locale') ? determine_locale() : get_locale();
     $is_en  = (stripos($locale, 'en') === 0);
@@ -174,11 +168,9 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
           $query->the_post();
           $meta = get_post_meta(get_the_ID());
           $ts   = isset($meta['_wcs_timestamp'][0]) ? intval($meta['_wcs_timestamp'][0]) : 0;
-
           if ($ts > 0 && $ts >= $now->getTimestamp()) {
-            $dateEvent = $this->format_event_date_html($ts);
-            $events[]  = [
-              'date' => $dateEvent,
+            $events[] = [
+              'date' => $this->format_event_date_html($ts),
               'link' => !empty($meta['_wcs_reservation_link'][0]) ? esc_url($meta['_wcs_reservation_link'][0]) : '',
             ];
           }
@@ -193,8 +185,8 @@ class BWC_Eventsschedulewp_imgheader_Plugin {
     }
 
     $output .= '<div class="simple-img-header-centered">';
-    if ($title) $output .= '<h2 class="simple-img-header-title">' . $title . '</h2>';
-    if ($subtitle) $output .= '<h3 class="simple-img-header-subtitle">' . $subtitle . '</h3>';
+    if ($title)       $output .= '<h2 class="simple-img-header-title">' . $title . '</h2>';
+    if ($subtitle)    $output .= '<h3 class="simple-img-header-subtitle">' . $subtitle . '</h3>';
     if ($subsubtitle) $output .= '<h4 class="simple-img-header-subsubtitle">' . $subsubtitle . '</h4>';
 
     if (!empty($events)) {
