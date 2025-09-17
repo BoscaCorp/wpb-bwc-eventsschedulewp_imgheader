@@ -1,7 +1,7 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-class BWC_Eventsschedulewp_ImgHeader_Plugin {
+class BWC_Eventsschedulewp_imgheader_Plugin {
 
   public function __construct() {
     // UI WPBakery
@@ -12,14 +12,11 @@ class BWC_Eventsschedulewp_ImgHeader_Plugin {
 
     // Assets
     add_action('wp_enqueue_scripts', [$this, 'register_assets']);
-
-    // Autocomplete (IMPORTANT: base = bwc_simple_img_header, param_name = event_id)
-    add_filter('vc_autocomplete_bwc_simple_img_header_event_id_callback', [$this, 'autocomplete_event_search'], 10, 1);
-    add_filter('vc_autocomplete_bwc_simple_img_header_event_id_render',   [$this, 'autocomplete_event_render'], 10, 1);
   }
 
   public function register_assets() {
-    wp_register_style('bwc-eventsschedulewp_imgheader', BWC_ESH_URL . 'public/css/style.css', [], BWC_ESH_VERSION);
+    // Suppose que BWC_SIH_URL et BWC_SIH_VERSION sont définis dans le fichier principal du plugin
+    wp_register_style('bwc-eventsschedulewp_imgheader', BWC_SIH_URL . 'public/css/style.css', [], BWC_SIH_VERSION);
   }
 
   public function vc_map_element() {
@@ -55,35 +52,17 @@ class BWC_Eventsschedulewp_ImgHeader_Plugin {
         ],
         [
           'type'        => 'textfield',
-          'heading'     => __('Lien direct (mode “lien”)', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'heading'     => __('Lien (mode “Lien”)', 'wpb-bwc-eventsschedulewp_imgheader'),
           'param_name'  => 'linkimg',
-          'description' => __('URL utilisée si aucun événement n’est sélectionné et que tu veux un CTA “Découvrir le site”.', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'description' => __('URL utilisée quand “Choix du spectacle” = Lien.', 'wpb-bwc-eventsschedulewp_imgheader'),
         ],
-
-        // === Sélection DYNAMIQUE d'un événement (CPT "class") ===
-        [
-          'type'        => 'autocomplete',
-          'heading'     => __('Spectacle (CPT "class")', 'wpb-bwc-eventsschedulewp_imgheader'),
-          'param_name'  => 'event_id', // clé des hooks autocomplete
-          'settings'    => [
-            'multiple'       => false,
-            'min_length'     => 1,
-            'delay'          => 200,
-            'unique_values'  => true,
-            'display_inline' => true,
-          ],
-          'description' => __('Tape pour rechercher un post du type "class", puis sélectionne-le.', 'wpb-bwc-eventsschedulewp_imgheader'),
-        ],
-
-        // === Fallback “champ libre” si tu ne veux pas utiliser l’autocomplete ===
+        // Champ libre de recherche (tu peux le garder pour compat)
         [
           'type'        => 'textfield',
-          'heading'     => __('Requête événement (texte libre - fallback)', 'wpb-bwc-eventsschedulewp_imgheader'),
-          'param_name'  => 'event_query',
-          'description' => __('Ex: "gala", "cendrillon"… Utilisé uniquement si aucun Spectacle n’est sélectionné.', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'heading'     => __('Requête événement (texte libre)', 'wpb-bwc-eventsschedulewp_imgheader'),
+          'param_name'  => 'event_name',
+          'description' => __('Saisis un mot-clé (ex. "gala", "cendrillon").', 'wpb-bwc-eventsschedulewp_imgheader'),
         ],
-
-        // Extras
         [
           'type'        => 'textfield',
           'heading'     => __('Element ID', 'wpb-bwc-eventsschedulewp_imgheader'),
@@ -100,51 +79,6 @@ class BWC_Eventsschedulewp_ImgHeader_Plugin {
     ]);
   }
 
-  // ==== Autocomplete: recherche ====
-  public function autocomplete_event_search($query) {
-    $term = isset($query['value']) ? sanitize_text_field($query['value']) : '';
-    if ($term === '') return [];
-
-    $q = new WP_Query([
-      'post_type'      => 'class',
-      's'              => $term,
-      'posts_per_page' => 20,
-      'post_status'    => 'publish',
-      'orderby'        => 'date',
-      'order'          => 'DESC',
-    ]);
-
-    $out = [];
-    while ($q->have_posts()) {
-      $q->the_post();
-      $id    = get_the_ID();
-      $title = get_the_title($id);
-      $ts    = (int) get_post_meta($id, '_wcs_timestamp', true);
-      $date  = $ts ? ' — '. wp_date('d M Y', $ts) : '';
-      $out[] = [
-        'value' => (string) $id,
-        'label' => $title . $date . ' (#'.$id.')',
-      ];
-    }
-    wp_reset_postdata();
-    return $out;
-  }
-
-  // ==== Autocomplete: rendu de la sélection ====
-  public function autocomplete_event_render($query) {
-    $id = isset($query['value']) ? (int) $query['value'] : 0;
-    if (!$id) return false;
-    $post = get_post($id);
-    if (!$post || $post->post_type !== 'class') return false;
-
-    $ts   = (int) get_post_meta($id, '_wcs_timestamp', true);
-    $date = $ts ? ' — '. wp_date('d M Y', $ts) : '';
-    return [
-      'value' => (string) $id,
-      'label' => get_the_title($id) . $date . ' (#'.$id.')',
-    ];
-  }
-
   private function sanitize_classes($classes) {
     $classes = trim((string)$classes);
     if ($classes === '') return '';
@@ -153,88 +87,116 @@ class BWC_Eventsschedulewp_ImgHeader_Plugin {
     return implode(' ', array_filter($safe));
   }
 
+  /**
+   * Formatte une date (timestamp Unix) selon la locale courante (Polylang/WPML friendly).
+   * Utilise IntlDateFormatter si dispo, sinon fallback sur wp_date() avec switch_to_locale().
+   * Retourne du HTML avec les bons spans/classes.
+   */
+  private function format_event_date_html(int $ts): string {
+    if ($ts <= 0) return '';
+
+    // Locale courante (respecte les plugins multi-langue)
+    $locale = function_exists('determine_locale') ? determine_locale() : get_locale();
+    $tz     = wp_timezone(); // DateTimeZone
+
+    if (class_exists('IntlDateFormatter')) {
+      // Jour de la semaine (lundi, Monday…)
+      $dayFmt  = new IntlDateFormatter($locale, \IntlDateFormatter::FULL, \IntlDateFormatter::NONE, $tz, null, 'EEEE');
+      // Jour + mois en toutes lettres + année (ex: 17 septembre 2025 / September 17, 2025)
+      // Remarque: 'd MMMM y' donne "17 septembre 2025" / "September 17, 2025" selon locale
+      // Pour coller à ton markup (deux spans séparés), on sépare jour vs reste.
+      $dateFmt = new IntlDateFormatter($locale, \IntlDateFormatter::FULL, \IntlDateFormatter::NONE, $tz, null, 'd MMMM y');
+
+      $day  = $dayFmt->format($ts);
+      $date = $dateFmt->format($ts);
+
+      return sprintf(
+        '<span class="prod-events_day">%s</span> <span class="prod-events_dates_contents">%s</span>',
+        esc_html($day),
+        esc_html($date)
+      );
+    }
+
+    // Fallback sans Intl : on bascule temporairement sur la locale courante pour wp_date()
+    if (function_exists('switch_to_locale')) {
+      switch_to_locale($locale);
+    }
+    $day  = wp_date('l', $ts, $tz);
+    $date = wp_date('d F Y', $ts, $tz);
+    if (function_exists('restore_previous_locale')) {
+      restore_previous_locale();
+    }
+
+    return sprintf(
+      '<span class="prod-events_day">%s</span> <span class="prod-events_dates_contents">%s</span>',
+      esc_html($day),
+      esc_html($date)
+    );
+  }
+
   public function render_shortcode($atts, $content = null, $tag = '') {
     $atts = shortcode_atts([
-      'image_id'    => '',
-      'title'       => '',
-      'subtitle'    => '',
-      'subsubtitle' => '',
-      'linkimg'     => '',
-      'event_id'    => '',   // NEW (autocomplete)
-      'event_query' => '',   // fallback libre
-      'element_id'  => '',
-      'extra_class' => '',
+      'image_id'     => '',
+      'title'        => '',
+      'subtitle'     => '',
+      'subsubtitle'  => '',
+      'linkimg'      => '',
+      'event_name'   => 'none',
+      'element_id'   => '',
+      'extra_class'  => '',
     ], $atts, 'bwc_simple_img_header');
 
     // Données
-    $image_id    = intval($atts['image_id']);
-    $img_url     = $image_id ? wp_get_attachment_image_url($image_id, 'full') : '';
-    $title       = wp_kses_post($atts['title']);
-    $subtitle    = wp_kses_post($atts['subtitle']);
-    $subsubtitle = wp_kses_post($atts['subsubtitle']);
-    $linkimg     = esc_url_raw($atts['linkimg']);
-    $event_id    = (int) $atts['event_id'];
-    $event_query = sanitize_text_field($atts['event_query']);
-    $element_id  = sanitize_title($atts['element_id']);
-    $extra_class = $this->sanitize_classes($atts['extra_class']);
+    $image_id     = intval($atts['image_id']);
+    $img_url      = $image_id ? wp_get_attachment_image_url($image_id, 'full') : '';
+    $title        = wp_kses_post($atts['title']);
+    $subtitle     = wp_kses_post($atts['subtitle']);
+    $subsubtitle  = wp_kses_post($atts['subsubtitle']);
+    $linkimg      = esc_url_raw($atts['linkimg']);
+    $eventName    = sanitize_text_field($atts['event_name']);
+    $element_id   = sanitize_title($atts['element_id']);
+    $extra_class  = $this->sanitize_classes($atts['extra_class']);
 
-    // Libellés CTA
-    $is_en          = (get_locale() === 'en_US');
-    $reservationBtn = $is_en ? 'Book' : 'Réserver';
-    $soonBtn        = $is_en ? 'On sale soon' : 'En vente prochainement';
-    $discoverBtn    = $is_en ? 'Discover the website' : 'Découvrir le site';
-    $onlineSoon     = $is_en ? 'Online soon' : 'Site prochainement en ligne';
+    // Libellés CTA (locale-aware)
+    $locale = function_exists('determine_locale') ? determine_locale() : get_locale();
+    $is_en  = (stripos($locale, 'en') === 0); // plus robuste que === 'en_US'
 
-    // Récupération de l'événement
-    $events = [];
-
-    // 1) Priorité à event_id (sélection via autocomplete)
-    if ($event_id) {
-      $post = get_post($event_id);
-      if ($post && $post->post_type === 'class' && $post->post_status === 'publish') {
-        $meta = get_post_meta($event_id);
-        $ts   = isset($meta['_wcs_timestamp'][0]) ? (int) $meta['_wcs_timestamp'][0] : 0;
-
-        $dateEvent = $ts ? sprintf(
-          '<span class="prod-events_day">%s</span> <span class="prod-events_dates_contents">%s</span>',
-          esc_html( wp_date('l', $ts) ),
-          esc_html( wp_date('d F Y', $ts) )
-        ) : '';
-
-        $reservationLink = !empty($meta['_wcs_reservation_link'][0]) ? $meta['_wcs_reservation_link'][0] : '';
-        $events[] = [
-          'name' => get_the_title($event_id),
-          'date' => $dateEvent,
-          'link' => esc_url($reservationLink),
-        ];
-      }
+    if ($eventName === 'link') {
+      $reservationBtn = $is_en ? 'Discover the website' : 'Découvrir le site';
+      $soonBtn        = $is_en ? 'Online soon' : 'Site prochainement en ligne';
+    } else {
+      $reservationBtn = $is_en ? 'Book' : 'Réserver';
+      $soonBtn        = $is_en ? 'On sale soon' : 'En vente prochainement';
     }
-    // 2) Sinon fallback event_query (texte libre)
-    elseif ($event_query !== '') {
-      $now = new DateTime('now', wp_timezone());
-      $q   = new WP_Query([
+
+    // Événements (optionnel selon event_name)
+    $events = [];
+    if ($eventName !== 'none') {
+      $now  = new DateTime('now', wp_timezone());
+      $args = [
         'post_type'      => 'class',
         'posts_per_page' => -1,
         'order'          => 'ASC',
         'post_status'    => 'publish',
-        's'              => $event_query,
-      ]);
-      if ($q->have_posts()) {
-        while ($q->have_posts()) {
-          $q->the_post();
-          $id   = get_the_ID();
-          $meta = get_post_meta($id);
-          $ts   = isset($meta['_wcs_timestamp'][0]) ? (int) $meta['_wcs_timestamp'][0] : 0;
+        's'              => $eventName, // recherche plein-texte (hérite de ton implémentation)
+      ];
+      $query = new WP_Query($args);
+
+      if ($query->have_posts()) {
+        while ($query->have_posts()) {
+          $query->the_post();
+          $eventID = get_the_ID();
+          $name    = get_the_title();
+          $meta    = get_post_meta($eventID);
+          $ts      = isset($meta['_wcs_timestamp'][0]) ? intval($meta['_wcs_timestamp'][0]) : 0;
 
           if ($ts > 0 && $ts >= $now->getTimestamp()) {
-            $dateEvent = sprintf(
-              '<span class="prod-events_day">%s</span> <span class="prod-events_dates_contents">%s</span>',
-              esc_html( wp_date('l', $ts) ),
-              esc_html( wp_date('d F Y', $ts) )
-            );
+            // >>> NOUVEAU : formatage 100% localisé <<<
+            $dateEvent = $this->format_event_date_html($ts);
+
             $reservationLink = !empty($meta['_wcs_reservation_link'][0]) ? $meta['_wcs_reservation_link'][0] : '';
             $events[] = [
-              'name' => get_the_title($id),
+              'name' => $name,
               'date' => $dateEvent,
               'link' => esc_url($reservationLink),
             ];
@@ -256,9 +218,15 @@ class BWC_Eventsschedulewp_ImgHeader_Plugin {
       }
 
       $output .= '<div class="simple-img-header-centered">';
-        if ($title)       $output .= '<h2 class="simple-img-header-title">' . $title . '</h2>';
-        if ($subtitle)    $output .= '<h3 class="simple-img-header-subtitle">' . $subtitle . '</h3>';
-        if ($subsubtitle) $output .= '<h4 class="simple-img-header-subsubtitle">' . $subsubtitle . '</h4>';
+        if ($title) {
+          $output .= '<h2 class="simple-img-header-title">' . $title . '</h2>';
+        }
+        if ($subtitle) {
+          $output .= '<h3 class="simple-img-header-subtitle">' . $subtitle . '</h3>';
+        }
+        if ($subsubtitle) {
+          $output .= '<h4 class="simple-img-header-subsubtitle">' . $subsubtitle . '</h4>';
+        }
 
         // Bloc CTA + date
         if (!empty($events)) {
@@ -269,23 +237,20 @@ class BWC_Eventsschedulewp_ImgHeader_Plugin {
             } else {
               $output .= '<div class="prod-events_link"><a href="' . $first['link'] . '">' . esc_html($reservationBtn) . '</a></div>';
             }
-            if (!empty($first['date'])) {
-              $output .= '<div class="prod-events_date">' . $first['date'] . '</div>';
-            }
+            $output .= '<div class="prod-events_date">' . $first['date'] . '</div>';
           $output .= '</div>';
-        } else {
-          // Mode “lien” si linkimg fourni, sinon “bientôt”
+        } elseif ($eventName === 'link') {
           $output .= '<div class="prod-events_container">';
             if (!empty($linkimg)) {
-              $output .= '<div class="prod-events_link"><a href="' . esc_url($linkimg) . '">' . esc_html($discoverBtn) . '</a></div>';
+              $output .= '<div class="prod-events_link"><a href="' . esc_url($linkimg) . '">' . esc_html($reservationBtn) . '</a></div>';
             } else {
-              $output .= '<div class="prod-events_link_empty"><span>' . esc_html($onlineSoon) . '</span></div>';
+              $output .= '<div class="prod-events_link_empty"><span>' . esc_html($soonBtn) . '</span></div>';
             }
           $output .= '</div>';
         }
 
-      $output .= '</div>'; // centered
-    $output .= '</div>';   // container
+      $output .= '</div>'; // .simple-img-header-centered
+    $output .= '</div>';   // .simple-img-header-container
 
     return $output;
   }
