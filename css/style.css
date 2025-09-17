@@ -1,0 +1,24 @@
+.simple-img-header-container img { width: 100%; }
+.simple-img-header-container { position: relative; text-align: center; color: white; }
+.simple-img-header-centered { width: 100%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.simple-img-header-title { font-size: 86px; line-height: 96px; color: #fff; }
+.simple-img-header-subtitle { font-size: 70px; color: #fff; line-height: 78px; }
+.simple-img-header-subsubtitle { color: #fff; font-size: 34px; }
+
+/* Prod Calendar */
+.prod-events_container { text-align: center; padding-top: 25px; }
+.prod-events_link a { font-weight: 700; color: #fff; text-decoration: none!important; text-transform: uppercase; background-color: #333; padding: 10px 50px; font-size: 22px; border-radius: 4px; margin: 23px; }
+.prod-events_link_empty span { font-weight: 700; color: #fff; text-decoration: none!important; text-transform: uppercase; background-color: #ac8840; padding: 10px 50px; font-size: 22px; border-radius: 4px; margin: 23px; }
+.prod-events_date { padding-top: 5px; font-weight: 700; color: #fff; text-transform: uppercase; }
+.prod-events_day { font-size: 1.5em; margin: 22px 0px 10px 0px; display: block; }
+.prod-events_dates_contents { font-size: 2.3em; }
+
+@media only screen and (max-width : 800px) {
+  .simple-img-header-title { font-size: 45px!important; line-height: 30px!important; }
+  .simple-img-header-subtitle { font-size: 22px!important; line-height: 18px!important; }
+  .simple-img-header-subsubtitle { font-size: 18px!important; line-height: 18px!important; }
+  .prod-events_container { padding-top: 0px!important; }
+  .prod-events_link a, .prod-events_link_empty span { padding: 5px 20px!important; font-size: 14px!important; }
+  .prod-events_day { font-size: 1em!important; margin: 0px!important; }
+  .prod-events_dates_contents { font-size: 1.3em!important; }
+}
